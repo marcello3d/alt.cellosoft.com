@@ -1,0 +1,37 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title>The Alt Cloud</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="../js/sh_style.css">
+  <script type="text/javascript" src="../js/sh_main.min.js"></script>
+  <script type="text/javascript" src="../js/sh_javascript.min.js"></script>
+</head>
+<body>
+<h1>The Alt Cloud</h1>
+<p>Written by <a href="http://marcello.cellosoft.com/">Marcello Bastéa-Forte</a><br>
+Version 0.1 - March 3rd, 2009</p>
+<h2>Introduction<br></h2>
+<p>The Alt Cloud is designed to let Alt scale and handle increasing demand by increasing the number of servers running
+Alt.</p>
+<h2>Peer-to-Peer</h2>
+<p>Each Alt server node runs the exact same Alt platform application without the need for configuration.</p>
+<p>The node generates a private and public key for identifying and encrypting communication between Alt nodes.  Using 
+the Alt control panel, you inform any Alt node of another Alt node's public key and they will become partnered.</p> 
+<p>Once two nodes are partnered they can communicate with any other Alt servers they are aware of.</p>
+<p>Network connectivity, execution speed/memory is discovered and mapped between the network.  When direct/secure pipes
+exist, the servers communicate with standard unencrypted streams, otherwise a ssh tunnel is used.</p>
+<h3>Database sharding</h3>
+<p>From there, database and execution is partitioned and duplicated between servers.</p>
+<p>Since the app code and configuration is stored in the database, this gets duplicated across the network as well.</p>
+<h2>Yay big happy family.</h2>
+<p>Not sure if this is easy, but it's a fun idea.</p> 
+<h2>Contact</h2>
+<p>That's it for now. </p>
+<p>Send me your thoughts! </p>
+<p><a href="mailto:marcello@cellosoft.com">marcello@cellosoft.com</a></p>
+<script type="text/javascript">sh_highlightDocument()</script>
+</body>
+</html>

@@ -1,0 +1,165 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
+<html>
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+  <meta http-equiv="Content-Style-Type" content="text/css">
+  <title>The Alt Database</title>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <link rel="stylesheet" type="text/css" href="../js/sh_style.css">
+  <script type="text/javascript" src="../js/sh_main.min.js"></script>
+  <script type="text/javascript" src="../js/sh_javascript.min.js"></script>
+</head>
+<body>
+<h1>The Alt Database</h1>
+<p>Written by <a href="http://marcello.cellosoft.com/">Marcello Bastéa-Forte</a><br>
+Version 0.1 - February 28th, 2009</p>
+<h2>Introduction<br></h2>
+<p>The database is made up of DataObjects. These objects look and act like regular JavaScript objects, but...</p> 
+<ol>
+    <li>...can contain any property you need.</li>
+    <li>...can be both an array and a hashmap.</li>
+</ol>
+<pre class="sh_javascript">
+// Get/make the posts database
+var posts = storage.myBlog.posts;
+</pre>
+<p>In the above code, <code>storage.myBlog</code> and <code>storage.myBlog.posts</code> are virtual DataObjects, they 
+are magically created when needed.</p>
+<pre class="sh_javascript">
+// Create a user and add to users database
+var user = { name: "Fred" };
+storage.myBlog.users.push(user);
+
+// Add a new post using the Array-like push method 
+var newPost = posts.push({
+    date:    new Date,
+    author:  user,
+    title:  "Rocking out my new Alt blog",
+    body:   "..."
+});
+</pre>
+<p>The author and post are defined as JavaScript objects.</p>
+<h2>Reading from the Database</h2>
+<p>You can perform Array-like queries on DataObjects:</p>
+<pre class="sh_javascript">
+// Get posts sorted by date in reverse 
+var postsByDate = posts.sort(function(a,b) {
+    return b.date.getTime() - a.date.getTime();
+});
+
+// Get the posts written by Fred  
+var postsByFred = posts.filter(function(post) {
+    return post.author.name == "Fred";
+});
+
+// Slice the latest 10 posts
+var latest10 = postsByDate.slice(0,10);
+</pre>
+<p>The methods above (<code>sort</code>, <code>filter</code>, <code>slice</code>) return DataView objects. These 
+read-only DataViews do not perform any computation until you actually retrieve the items:</p>
+<pre class="sh_javascript">
+response.writeln("posts fred has written: "+ postsByFred.length); 
+// Print out each post
+latest10.forEach(function (post) {
+    response.writeln(post.title + " by " + post.author.name);
+    response.writeln(post.body);
+});
+</pre>
+<h2>Storing Custom Objects</h2>
+<p>Most likely you will not be working with vanilla JavaScript objects, but your own classes with methods. However, if
+we try to store your class instance in the database we get an exception:</p>
+<pre class="sh_javascript">
+function User(name) {
+    this.name = name;
+}
+User.prototype.sendEmail = function() { ... }
+
+var user = new User('The Alt Dude');
+storage.myBlog.users.push(user); // throws alt.FunctionNotPersistable exception
+</pre>
+<p>This occurs because the Alt database explicitly prevents you from storing function objects in the database. This is
+both a simplification and a security feature (you can always store a string representation if absolutely needed). To 
+solve this you need to make the function persistable:</p>
+<pre class="sh_javascript">
+function User(name) {
+    this.name = name;
+}
+User.prototype.sendEmail = function() { ... }
+User.makePersistent("myBlog.User");
+</pre>
+<p>The alt database will then use the persistence ID ("myBlog.User" in this case) to map the object to and from a 
+prototype. For further control the onlyPersist method can be used to restrict what properties are persisted:</p>
+<pre class="sh_javascript">
+// Only persist the properties name, password, and email
+User.onlyPersist("name", "password", "email");
+
+// Only persist properties that do not start with an underscore
+User.onlyPersist(function (propertyName) {
+    return propertyName[0] != '_';
+});    
+</pre>
+<h3>Storing Java objects</h3>
+<p>Alt uses Java's Serialization functionality to store any Java objects that are serializable. Any Java serialization
+exceptions will be passed to JavaScript.</p>
+<h2>Holy inefficiency batman! This can't be good!</h2>
+<p>If you are wondering how this can be done efficiently, you are indeed a sharp one. Surely databases cannot be this
+simple!</p>
+<p>There are two tricks we can use to make this run well.</p>
+<ol>
+    <li>Delayed execution.
+    <ul>
+        <li>When the user writes <code>posts.sort(...).filter(...).slice(...)</code>, we queue up the operations into
+        DataView objects that are all sent to the database engine when the user calls forEach or accesses the length
+        property.</li>
+        <li>The database then evaluates the sort, filter, slice, etc. functions upon the data (in whatever order it
+        prefers&mdash;when interchangeable). The database can take advantage of any indices to speed up the 
+        operation.</li>
+    </ul></li>
+    
+    <li>Auto-indices
+    <ul>
+        <li>In the process of evaluating a sort or filter, the database server has the option of creating an index of
+        the resultant data.</li>
+        <li>By dynamically profiling what sorts and filters are slow or frequently accessed at runtime, the database 
+        server can create and delete indices (or views) on the fly for performance/space reasons.</li> 
+    </ul>
+    </li>
+</ol>
+<h2>Implementation/design questions</h2>
+<ol>
+	<li>should db.foo.bar.bah automatically create foo, bar, and bah DataObjects?
+	<ul>
+		<li>on one hand if objects are automatically updated, you don't need to do:
+<pre class="sh_javascript">
+if (!db.foo) { db.foo = {}; }
+if (!db.foo.bar) { db.foo.bar = {}; }
+if (!db.foo.bar.bah) { db.foo.bar.bah = {}; }
+// access db.foo.bar.bah</pre></li>
+		<li>on the other hand, you can access db.foo.bar.bah normally, but everything will exist regardless (unexpected
+		behavior):
+<pre class="sh_javascript">
+if (db.foo.bar.bah.This.should.not.exist) {
+	// but it does anyway
+}
+</pre></li>
+	</ul></li>
+	<li>should regular objects be converted to DataObjects? 
+	<ul>
+		<li>only allow explicit DataObjects to be stored as such?</li>
+		<li>allow conversion: objects->dataobjects, array->dataobjects</li>
+	</ul></li>
+	<li>how do we support scope in functions passed to DataViews?</li>
+	<li>does each database server store the index of parent node -> child node? what if it's huge? 
+		<ul>
+			<li>only store index for parent nodes on the local server? billions of children?</li>
+			<li>how far can it scale?  (imagine storing the twitter database)</li>
+		</ul>
+	</li>
+</ol>
+<h2>Contact</h2>
+<p>That's it for now. </p>
+<p>Send me your thoughts! </p>
+<p><a href="mailto:marcello@cellosoft.com">marcello@cellosoft.com</a></p>
+<script type="text/javascript">sh_highlightDocument()</script>
+</body>
+</html>
